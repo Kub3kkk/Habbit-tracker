@@ -19,9 +19,6 @@ import { useNavigation } from '@react-navigation/native';
 const AddGoalScreen = () => {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showReminder, setShowReminder] = useState(false);
-  const [reminderTime, setReminderTime] = useState(new Date());
-  const [showTimePicker, setShowTimePicker] = useState(false);
   
   const { theme } = useTheme();
   const navigation = useNavigation<any>();
@@ -30,24 +27,12 @@ const AddGoalScreen = () => {
     if (!name.trim()) return;
     setLoading(true);
     
-    // Pass reminder as ISO string if enabled
-    const finalReminder = showReminder ? reminderTime.toISOString() : null;
-    await GoalService.addGoal(name.trim(), finalReminder);
+    // Reminders are now handled exclusively in the Notifications section
+    await GoalService.addGoal(name.trim(), null);
     
     setName('');
-    setShowReminder(false);
     setLoading(false);
     navigation.navigate('Dashboard');
-  };
-
-  const onTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    // Hide picker for Android, keep for iOS (inline)
-    if (Platform.OS !== 'ios') {
-      setShowTimePicker(false);
-    }
-    if (selectedDate) {
-      setReminderTime(selectedDate);
-    }
   };
 
   return (
@@ -69,40 +54,15 @@ const AddGoalScreen = () => {
             autoFocus
           />
 
-          <View style={[styles.reminderControl, { borderTopColor: theme.border }]}>
-            <View style={styles.reminderHeader}>
-              <View style={styles.reminderTitle}>
-                <Ionicons name="notifications-outline" size={20} color={theme.text} />
-                <Text style={[styles.reminderLabel, { color: theme.text }]}>Daily Reminder</Text>
-              </View>
-              <Switch
-                value={showReminder}
-                onValueChange={setShowReminder}
-                trackColor={{ false: theme.border, true: theme.primary }}
-              />
+          <View style={styles.tips}>
+            <View style={styles.tipRow}>
+              <Ionicons name="flash-outline" size={20} color={theme.primary} />
+              <Text style={[styles.tipText, { color: theme.textSecondary }]}>Start small and stay consistent.</Text>
             </View>
-
-            {showReminder && (
-              <TouchableOpacity 
-                style={[styles.timePickerBtn, { backgroundColor: theme.background, borderColor: theme.border }]}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Text style={[styles.timeText, { color: theme.text }]}>
-                  {reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-                <Ionicons name="time-outline" size={20} color={theme.primary} />
-              </TouchableOpacity>
-            )}
-
-            {showTimePicker && (
-              <DateTimePicker
-                value={reminderTime}
-                mode="time"
-                is24Hour={true}
-                display="default"
-                onChange={onTimeChange}
-              />
-            )}
+            <View style={styles.tipRow}>
+              <Ionicons name="time-outline" size={20} color={theme.primary} />
+              <Text style={[styles.tipText, { color: theme.textSecondary }]}>Focus on the process, not just the result.</Text>
+            </View>
           </View>
         </View>
 
@@ -157,37 +117,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 24,
   },
-  reminderControl: {
-    borderTopWidth: 1,
-    paddingTop: 20,
-    marginTop: 12,
+  tips: {
+    gap: 16,
   },
-  reminderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  reminderTitle: {
+  tipRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
-  reminderLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  timePickerBtn: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  timeText: {
-    fontSize: 18,
-    fontWeight: '700',
+  tipText: {
+    fontSize: 14,
   },
   button: {
     borderRadius: 20,

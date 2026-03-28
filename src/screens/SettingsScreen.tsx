@@ -1,18 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   TouchableOpacity, 
   Switch, 
-  ScrollView 
+  ScrollView,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import { NotificationService } from '../services/NotificationService';
+import { useNavigation } from '@react-navigation/native';
 
 const SettingsScreen = () => {
   const { theme, isDark, toggleTheme } = useTheme();
+  const navigation = useNavigation();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  useEffect(() => {
+    loadNotificationStatus();
+  }, []);
+
+  const loadNotificationStatus = async () => {
+    const enabled = await NotificationService.isGloballyEnabled();
+    setNotificationsEnabled(enabled);
+  };
+
+  const handleToggleNotifications = async (value: boolean) => {
+    if (value) {
+      const granted = await NotificationService.requestPermissions();
+      if (!granted) {
+        Alert.alert('Permission Denied', 'Please enable notifications in your phone settings.');
+        return;
+      }
+    }
+    setNotificationsEnabled(value);
+    await NotificationService.setGlobalEnabled(value);
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -37,15 +63,35 @@ const SettingsScreen = () => {
               thumbColor={isDark ? theme.text : '#f4f3f4'}
             />
           </View>
-        </View>
+          
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-        <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <TouchableOpacity style={styles.row}>
+          <View style={styles.row}>
             <View style={styles.rowLabel}>
               <View style={[styles.iconBox, { backgroundColor: theme.background }]}>
                 <Ionicons name="notifications-outline" size={20} color={theme.primary} />
               </View>
-              <Text style={[styles.labelText, { color: theme.text }]}>Notifications</Text>
+              <Text style={[styles.labelText, { color: theme.text }]}>Global Notifications</Text>
+            </View>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={handleToggleNotifications}
+              trackColor={{ false: theme.border, true: theme.primary }}
+              thumbColor={notificationsEnabled ? theme.text : '#f4f3f4'}
+            />
+          </View>
+        </View>
+
+        <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <TouchableOpacity 
+            style={styles.row}
+            onPress={() => navigation.navigate('GoalNotifications' as never)}
+          >
+            <View style={styles.rowLabel}>
+              <View style={[styles.iconBox, { backgroundColor: theme.background }]}>
+                <Ionicons name="notifications-outline" size={20} color={theme.primary} />
+              </View>
+              <Text style={[styles.labelText, { color: theme.text }]}>Habit Notifications</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
           </TouchableOpacity>

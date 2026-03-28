@@ -1,13 +1,25 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
 import AddGoalScreen from '../screens/AddGoalScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import NotificationsSettingsScreen from '../screens/NotificationsSettingsScreen';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 
 const Tab = createBottomTabNavigator();
+const SettingsStack = createNativeStackNavigator();
+
+const SettingsStackScreen = () => {
+  return (
+    <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
+      <SettingsStack.Screen name="SettingsHome" component={SettingsScreen} />
+      <SettingsStack.Screen name="GoalNotifications" component={NotificationsSettingsScreen} />
+    </SettingsStack.Navigator>
+  );
+};
 
 const RootNavigator = () => {
   const { theme } = useTheme();
@@ -45,7 +57,7 @@ const RootNavigator = () => {
     >
       <Tab.Screen name="Dashboard" component={HomeScreen} />
       <Tab.Screen name="Add" component={AddGoalScreen} options={{ tabBarLabel: 'New Habit' }} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="Settings" component={SettingsStackScreen} />
     </Tab.Navigator>
   );
 };

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NotificationService } from './NotificationService';
 
 export interface Goal {
   id: string;
@@ -6,6 +7,7 @@ export interface Goal {
   streak: number;
   completedAt: string | null;
   history: string[]; // List of unique date strings "YYYY-MM-DD"
+  reminderTime: string | null; // ISO Date of the set reminder time or null
 }
 
 const STORAGE_KEY = '@habbit_tracker_goals';
@@ -23,10 +25,7 @@ export const GoalService = {
 
       let hasChanges = false;
       const validatedGoals = goals.map(goal => {
-        // Ensure history array exists
         if (!goal.history) goal.history = [];
-        
-        // Validation: if last completed was before yesterday, reset streak
         if (!goal.completedAt || goal.streak === 0) return goal;
 
         const lastDateStr = new Date(goal.completedAt).toLocaleDateString('en-CA');
@@ -58,7 +57,7 @@ export const GoalService = {
     }
   },
 
-  addGoal: async (name: string): Promise<Goal> => {
+  addGoal: async (name: string, reminderTime: string | null = null): Promise<Goal> => {
     const goals = await GoalService.getGoals();
     const newGoal: Goal = {
       id: Date.now().toString(),
@@ -66,7 +65,14 @@ export const GoalService = {
       streak: 0,
       completedAt: null,
       history: [],
+      reminderTime,
     };
+
+    // If reminderTime is set, schedule notification
+    if (reminderTime) {
+      await NotificationService.scheduleGoalReminder(newGoal.id, newGoal.name, new Date(reminderTime));
+    }
+
     await GoalService.saveGoals([...goals, newGoal]);
     return newGoal;
   },
@@ -74,10 +80,14 @@ export const GoalService = {
   deleteGoal: async (id: string) => {
     const goals = await GoalService.getGoals();
     const filtered = goals.filter(g => g.id !== id);
+    
+    // Cancel notification
+    await NotificationService.cancelGoalReminder(id);
+
     await GoalService.saveGoals(filtered);
     return filtered;
   },
-
+// ... toggleGoal implementation is unchanged for now or I can update it to be cleaner
   toggleGoal: async (id: string) => {
     const goals = await GoalService.getGoals();
     const todayStr = new Date().toLocaleDateString('en-CA');
@@ -92,13 +102,10 @@ export const GoalService = {
         let newCompletedAt = g.completedAt;
 
         if (isCurrentlyCompleted) {
-          // Untoggle today
           newHistory = newHistory.filter(d => d !== todayStr);
           newStreak = Math.max(0, newStreak - 1);
-          // Set completedAt to previous completion or null
           newCompletedAt = newHistory.length > 0 ? newHistory[newHistory.length - 1] : null;
         } else {
-          // Toggle today
           newHistory.push(todayStr);
           newStreak = newStreak + 1;
           newCompletedAt = todayStr;

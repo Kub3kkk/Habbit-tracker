@@ -4,6 +4,7 @@ import { NotificationService } from './NotificationService';
 export interface Goal {
   id: string;
   name: string;
+  icon: string;
   streak: number;
   completedAt: string | null;
   history: string[]; // List of unique date strings "YYYY-MM-DD"
@@ -26,6 +27,7 @@ export const GoalService = {
       let hasChanges = false;
       const validatedGoals = goals.map(goal => {
         if (!goal.history) goal.history = [];
+        if (!goal.icon) goal.icon = 'star';
         if (!goal.completedAt || goal.streak === 0) return goal;
 
         const lastDateStr = new Date(goal.completedAt).toLocaleDateString('en-CA');
@@ -57,11 +59,12 @@ export const GoalService = {
     }
   },
 
-  addGoal: async (name: string, reminderTime: string | null = null): Promise<Goal> => {
+  addGoal: async (name: string, icon: string = 'star', reminderTime: string | null = null): Promise<Goal> => {
     const goals = await GoalService.getGoals();
     const newGoal: Goal = {
       id: Date.now().toString(),
       name,
+      icon,
       streak: 0,
       completedAt: null,
       history: [],
@@ -88,6 +91,26 @@ export const GoalService = {
     return filtered;
   },
 // ... toggleGoal implementation is unchanged for now or I can update it to be cleaner
+  updateGoal: async (id: string, updates: Partial<Pick<Goal, 'name' | 'icon'>>) => {
+    const goals = await GoalService.getGoals();
+    let updatedGoal: Goal | undefined;
+
+    const updated = goals.map(g => {
+      if (g.id === id) {
+        updatedGoal = { ...g, ...updates };
+        return updatedGoal;
+      }
+      return g;
+    });
+
+    if (updatedGoal && updates.name && updatedGoal.reminderTime) {
+      await NotificationService.cancelGoalReminder(id);
+      await NotificationService.scheduleGoalReminder(id, updates.name, new Date(updatedGoal.reminderTime));
+    }
+
+    await GoalService.saveGoals(updated);
+    return updated;
+  },
   toggleGoal: async (id: string) => {
     const goals = await GoalService.getGoals();
     const todayStr = new Date().toLocaleDateString('en-CA');

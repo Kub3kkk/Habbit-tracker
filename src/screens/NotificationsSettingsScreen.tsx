@@ -9,7 +9,6 @@ import {
   Platform 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import { GoalService, Goal } from '../services/GoalService';
 import { NotificationService } from '../services/NotificationService';
@@ -35,9 +34,11 @@ const NotificationsSettingsScreen = () => {
   };
 
   const handleToggleReminder = async (goal: Goal, enabled: boolean) => {
+    // For now, toggle sets current time if no time or null if disabled
+    const now = new Date();
     const updatedGoals = goals.map(g => {
       if (g.id === goal.id) {
-        return { ...g, reminderTime: enabled ? new Date().toISOString() : null };
+        return { ...g, reminderTime: enabled ? now.toISOString() : null };
       }
       return g;
     });
@@ -46,32 +47,9 @@ const NotificationsSettingsScreen = () => {
     await GoalService.saveGoals(updatedGoals);
 
     if (enabled) {
-      // Automatically open picker if enabling
-      setEditingGoal(goal);
-      setTempTime(new Date());
-      setShowTimePicker(true);
+      await NotificationService.scheduleGoalReminder(goal.id, goal.name, now);
     } else {
       await NotificationService.cancelGoalReminder(goal.id);
-    }
-  };
-
-  const onTimeChange = async (event: DateTimePickerEvent, selectedDate?: Date) => {
-    // Hide picker for Android
-    if (Platform.OS !== 'ios') {
-      setShowTimePicker(false);
-    }
-
-    if (selectedDate && editingGoal) {
-      const updatedGoals = goals.map(g => {
-        if (g.id === editingGoal.id) {
-          return { ...g, reminderTime: selectedDate.toISOString() };
-        }
-        return g;
-      });
-      setGoals(updatedGoals);
-      await GoalService.saveGoals(updatedGoals);
-      await NotificationService.scheduleGoalReminder(editingGoal.id, editingGoal.name, selectedDate);
-      setEditingGoal(null);
     }
   };
 
@@ -84,17 +62,9 @@ const NotificationsSettingsScreen = () => {
         <View style={styles.goalInfo}>
           <Text style={[styles.goalName, { color: theme.text }]}>{item.name}</Text>
           {hasReminder && (
-            <TouchableOpacity 
-              onPress={() => {
-                setEditingGoal(item);
-                setTempTime(reminderDate || new Date());
-                setShowTimePicker(true);
-              }}
-            >
-              <Text style={[styles.reminderTimeText, { color: theme.primary }]}>
-                {reminderDate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-            </TouchableOpacity>
+            <Text style={[styles.reminderTimeText, { color: theme.primary }]}>
+              {reminderDate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
           )}
         </View>
         <Switch
@@ -124,16 +94,6 @@ const NotificationsSettingsScreen = () => {
           <Text style={[styles.empty, { color: theme.textSecondary }]}>No habits created yet.</Text>
         }
       />
-
-      {showTimePicker && (
-        <DateTimePicker
-          value={tempTime}
-          mode="time"
-          is24Hour={true}
-          display="default"
-          onChange={onTimeChange}
-        />
-      )}
     </SafeAreaView>
   );
 };

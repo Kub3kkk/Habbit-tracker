@@ -10,7 +10,7 @@ import {
   RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { GoalService, Goal } from '../services/GoalService';
@@ -21,6 +21,7 @@ const HomeScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { theme } = useTheme();
+  const navigation = useNavigation<any>();
 
   useFocusEffect(
     useCallback(() => {
@@ -85,10 +86,13 @@ const HomeScreen = () => {
       <TouchableOpacity 
         activeOpacity={0.8}
         style={[styles.habitCard, { backgroundColor: theme.surface, borderColor: theme.border }, completed && styles.habitCardCompleted]}
-        onPress={() => handleToggleGoal(item.id)}
+        onPress={() => navigation.navigate('GoalDetails', { goalId: item.id })}
         onLongPress={() => handleDeleteGoal(item.id, item.name)}
       >
         <View style={styles.cardHeader}>
+          <View style={[styles.iconContainer, { backgroundColor: theme.background }]}>
+            <Ionicons name={item.icon as any} size={24} color={completed ? theme.textSecondary : theme.primary} />
+          </View>
           <View style={styles.habitInfo}>
             <Text style={[styles.habitName, { color: theme.text }, completed && { color: theme.textSecondary, textDecorationLine: 'line-through' }]}>
               {item.name}
@@ -98,9 +102,13 @@ const HomeScreen = () => {
               <Text style={[styles.habitStreak, { color: theme.warning }]}>{item.streak} day streak</Text>
             </View>
           </View>
-          <View style={[styles.checkbox, { borderColor: theme.border, backgroundColor: theme.background }, completed && { backgroundColor: theme.success, borderColor: theme.success }]}>
+          <TouchableOpacity 
+            activeOpacity={0.7} 
+            onPress={() => handleToggleGoal(item.id)}
+            style={[styles.checkbox, { borderColor: theme.border, backgroundColor: theme.background }, completed && { backgroundColor: theme.success, borderColor: theme.success }]}
+          >
             {completed && <Ionicons name="checkmark" size={20} color="#FFFFFF" />}
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.gridSection, { borderTopColor: theme.border }]}>
@@ -185,9 +193,16 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 16,
+    gap: 16,
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   habitInfo: {
     flex: 1,

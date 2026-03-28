@@ -15,9 +15,11 @@ import { useTheme } from '../context/ThemeContext';
 import { GoalService } from '../services/GoalService';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { HABIT_ICONS } from '../constants/HabitIcons';
 
 const AddGoalScreen = () => {
   const [name, setName] = useState('');
+  const [selectedIcon, setSelectedIcon] = useState('star');
   const [loading, setLoading] = useState(false);
   
   const { theme } = useTheme();
@@ -27,10 +29,10 @@ const AddGoalScreen = () => {
     if (!name.trim()) return;
     setLoading(true);
     
-    // Reminders are now handled exclusively in the Notifications section
-    await GoalService.addGoal(name.trim(), null);
+    await GoalService.addGoal(name.trim(), selectedIcon, null);
     
     setName('');
+    setSelectedIcon('star');
     setLoading(false);
     navigation.navigate('Dashboard');
   };
@@ -53,6 +55,27 @@ const AddGoalScreen = () => {
             onChangeText={setName}
             autoFocus
           />
+
+          <Text style={[styles.label, { color: theme.text, marginTop: 8 }]}>Pick an icon</Text>
+          <View style={styles.iconGrid}>
+            {HABIT_ICONS.map((icon) => (
+              <TouchableOpacity
+                key={icon}
+                onPress={() => setSelectedIcon(icon)}
+                style={[
+                  styles.iconOption,
+                  { backgroundColor: theme.background, borderColor: theme.border },
+                  selectedIcon === icon && { backgroundColor: theme.primary, borderColor: theme.primary }
+                ]}
+              >
+                <Ionicons 
+                  name={icon as any} 
+                  size={24} 
+                  color={selectedIcon === icon ? '#FFFFFF' : theme.text} 
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <View style={styles.tips}>
             <View style={styles.tipRow}>
@@ -117,8 +140,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 24,
   },
+  iconGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 24,
+  },
+  iconOption: {
+    width: 50,
+    height: 50,
+    borderRadius: 15,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   tips: {
     gap: 16,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 16,
   },
   tipRow: {
     flexDirection: 'row',

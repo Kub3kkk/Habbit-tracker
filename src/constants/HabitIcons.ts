@@ -1,0 +1,16 @@
+export const HABIT_ICONS = [
+  'star',
+  'fitness',
+  'book',
+  'water',
+  'leaf',
+  'briefcase',
+  'heart',
+  'code-slash',
+  'musical-notes',
+  'bed',
+  'bicycle',
+  'walk',
+  'camera',
+  'fast-food',
+];

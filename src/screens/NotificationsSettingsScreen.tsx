@@ -6,8 +6,9 @@ import {
   FlatList, 
   TouchableOpacity, 
   Switch, 
-  Platform 
+  Platform,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { GoalService, Goal } from '../services/GoalService';
@@ -34,7 +35,6 @@ const NotificationsSettingsScreen = () => {
   };
 
   const handleToggleReminder = async (goal: Goal, enabled: boolean) => {
-    // For now, toggle sets current time if no time or null if disabled
     const now = new Date();
     const updatedGoals = goals.map(g => {
       if (g.id === goal.id) {
@@ -47,10 +47,39 @@ const NotificationsSettingsScreen = () => {
     await GoalService.saveGoals(updatedGoals);
 
     if (enabled) {
-      await NotificationService.scheduleGoalReminder(goal.id, goal.name, now);
+      // Small delay just to reflect toggle before scheduling background notification
+      setTimeout(() => {
+        NotificationService.scheduleGoalReminder(goal.id, goal.name, now);
+      }, 100);
     } else {
       await NotificationService.cancelGoalReminder(goal.id);
     }
+  };
+
+  const onTimeChange = async (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowTimePicker(false);
+    if (selectedDate && editingGoal) {
+      const updatedGoals = goals.map(g => {
+        if (g.id === editingGoal.id) {
+          return { ...g, reminderTime: selectedDate.toISOString() };
+        }
+        return g;
+      });
+      
+      setGoals(updatedGoals);
+      await GoalService.saveGoals(updatedGoals);
+      
+      // Reschedule
+      NotificationService.scheduleGoalReminder(editingGoal.id, editingGoal.name, selectedDate);
+      setEditingGoal(null);
+    }
+  };
+
+  const openTimePicker = (goal: Goal) => {
+    if (!goal.reminderTime) return;
+    setEditingGoal(goal);
+    setTempTime(new Date(goal.reminderTime));
+    setShowTimePicker(true);
   };
 
   const renderGoalItem = ({ item }: { item: Goal }) => {
@@ -58,21 +87,28 @@ const NotificationsSettingsScreen = () => {
     const reminderDate = item.reminderTime ? new Date(item.reminderTime) : null;
 
     return (
-      <View style={[styles.goalCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <TouchableOpacity 
+        style={[styles.goalCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        onPress={() => openTimePicker(item)}
+      >
         <View style={styles.goalInfo}>
           <Text style={[styles.goalName, { color: theme.text }]}>{item.name}</Text>
           {hasReminder && (
-            <Text style={[styles.reminderTimeText, { color: theme.primary }]}>
-              {reminderDate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
+            <View style={styles.timeBadge}>
+              <Ionicons name="time-outline" size={14} color={theme.primary} />
+              <Text style={[styles.reminderTimeText, { color: theme.primary }]}>
+                {reminderDate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </View>
           )}
         </View>
         <Switch
           value={hasReminder}
           onValueChange={(val) => handleToggleReminder(item, val)}
           trackColor={{ false: theme.border, true: theme.primary }}
+          thumbColor={Platform.OS === 'android' ? (hasReminder ? theme.primary : '#f4f3f4') : ''}
         />
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -94,6 +130,16 @@ const NotificationsSettingsScreen = () => {
           <Text style={[styles.empty, { color: theme.textSecondary }]}>No habits created yet.</Text>
         }
       />
+
+      {showTimePicker && (
+        <DateTimePicker
+          value={tempTime}
+          mode="time"
+          is24Hour={true}
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={onTimeChange}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -143,6 +189,12 @@ const styles = StyleSheet.create({
   reminderTimeText: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  timeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
   },
   empty: {
     textAlign: 'center',

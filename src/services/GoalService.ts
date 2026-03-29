@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NotificationService } from './NotificationService';
+import { DEFAULT_CATEGORY } from '../constants/HabitCategories';
 
 export interface Goal {
   id: string;
   name: string;
   icon: string;
+  category: string;
   streak: number;
   completedAt: string | null;
   history: string[]; // List of unique date strings "YYYY-MM-DD"
@@ -26,17 +28,20 @@ export const GoalService = {
 
       let hasChanges = false;
       const validatedGoals = goals.map(goal => {
-        if (!goal.history) goal.history = [];
-        if (!goal.icon) goal.icon = 'star';
-        if (!goal.completedAt || goal.streak === 0) return goal;
+        let updated = { ...goal };
+        if (!updated.history) { updated.history = []; hasChanges = true; }
+        if (!updated.icon) { updated.icon = 'star'; hasChanges = true; }
+        if (!updated.category) { updated.category = DEFAULT_CATEGORY; hasChanges = true; }
 
-        const lastDateStr = new Date(goal.completedAt).toLocaleDateString('en-CA');
+        if (!updated.completedAt || updated.streak === 0) return updated;
+
+        const lastDateStr = new Date(updated.completedAt).toLocaleDateString('en-CA');
         
         if (lastDateStr !== todayStr && lastDateStr !== yesterdayStr) {
           hasChanges = true;
-          return { ...goal, streak: 0 };
+          return { ...updated, streak: 0 };
         }
-        return goal;
+        return updated;
       });
 
       if (hasChanges) {
@@ -59,24 +64,27 @@ export const GoalService = {
     }
   },
 
-  addGoal: async (name: string, icon: string = 'star', reminderTime: string | null = null): Promise<Goal> => {
+  addGoal: async (name: string, icon: string = 'star', category: string = DEFAULT_CATEGORY, reminderTime: string | null = null): Promise<Goal> => {
     const goals = await GoalService.getGoals();
     const newGoal: Goal = {
       id: Date.now().toString(),
       name,
       icon,
+      category,
       streak: 0,
       completedAt: null,
       history: [],
       reminderTime,
     };
 
-    // If reminderTime is set, schedule notification
+    await GoalService.saveGoals([...goals, newGoal]);
+    
+    // If reminderTime is set, schedule notification (non-blocking)
     if (reminderTime) {
-      await NotificationService.scheduleGoalReminder(newGoal.id, newGoal.name, new Date(reminderTime));
+      NotificationService.scheduleGoalReminder(newGoal.id, newGoal.name, new Date(reminderTime))
+        .catch(err => console.error('Background notification error:', err));
     }
 
-    await GoalService.saveGoals([...goals, newGoal]);
     return newGoal;
   },
 
@@ -91,7 +99,7 @@ export const GoalService = {
     return filtered;
   },
 // ... toggleGoal implementation is unchanged for now or I can update it to be cleaner
-  updateGoal: async (id: string, updates: Partial<Pick<Goal, 'name' | 'icon'>>) => {
+  updateGoal: async (id: string, updates: Partial<Pick<Goal, 'name' | 'icon' | 'category'>>) => {
     const goals = await GoalService.getGoals();
     let updatedGoal: Goal | undefined;
 
@@ -104,8 +112,9 @@ export const GoalService = {
     });
 
     if (updatedGoal && updates.name && updatedGoal.reminderTime) {
-      await NotificationService.cancelGoalReminder(id);
-      await NotificationService.scheduleGoalReminder(id, updates.name, new Date(updatedGoal.reminderTime));
+      NotificationService.cancelGoalReminder(id);
+      NotificationService.scheduleGoalReminder(id, updates.name, new Date(updatedGoal.reminderTime))
+        .catch(err => console.error('Background notification error:', err));
     }
 
     await GoalService.saveGoals(updated);

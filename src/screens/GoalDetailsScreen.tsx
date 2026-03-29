@@ -10,6 +10,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -18,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { GoalService, Goal } from '../services/GoalService';
 import ContributionGrid from '../components/ContributionGrid';
 import { HABIT_ICONS } from '../constants/HabitIcons';
+import { HABIT_CATEGORIES } from '../constants/HabitCategories';
 
 const { width } = Dimensions.get('window');
 
@@ -34,6 +36,7 @@ const GoalDetailsScreen = () => {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
   const [editIcon, setEditIcon] = useState('');
+  const [editCategory, setEditCategory] = useState('');
 
   const loadGoalDetails = useCallback(async () => {
     const goals = await GoalService.getGoals();
@@ -42,6 +45,7 @@ const GoalDetailsScreen = () => {
       setGoal(found);
       setEditName(found.name);
       setEditIcon(found.icon);
+      setEditCategory(found.category || 'other');
     }
     setLoading(false);
   }, [goalId]);
@@ -54,9 +58,31 @@ const GoalDetailsScreen = () => {
 
   const handleUpdate = async () => {
     if (!editName.trim()) return;
-    await GoalService.updateGoal(goalId, { name: editName.trim(), icon: editIcon });
+    await GoalService.updateGoal(goalId, { 
+      name: editName.trim(), 
+      icon: editIcon,
+      category: editCategory
+    });
     setIsEditModalVisible(false);
     loadGoalDetails();
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Usuń nawyk",
+      "Czy na pewno chcesz bezpowrotnie usunąć ten nawyk?",
+      [
+        { text: "Anuluj", style: "cancel" },
+        { 
+          text: "Usuń", 
+          style: "destructive",
+          onPress: async () => {
+            await GoalService.deleteGoal(goalId);
+            navigation.goBack();
+          }
+        }
+      ]
+    );
   };
 
   if (!goal || loading) {
@@ -72,13 +98,15 @@ const GoalDetailsScreen = () => {
   const bestStreak = calculateBestStreak(goal.history);
   const completionRate = calculateCompletionRate(goal.history);
 
+  const currentCategory = HABIT_CATEGORIES.find(c => c.id === goal.category) || HABIT_CATEGORIES[HABIT_CATEGORIES.length - 1];
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>Habit Detail</Text>
+        <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>Szczegóły Nawyku</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -88,42 +116,57 @@ const GoalDetailsScreen = () => {
           </View>
           <Text style={[styles.habitName, { color: theme.text }]}>{goal.name}</Text>
           
+          <View style={[styles.categoryBadge, { backgroundColor: theme.background }]}>
+            <Ionicons name={currentCategory.icon as any} size={14} color={theme.primary} />
+            <Text style={[styles.categoryBadgeText, { color: theme.textSecondary }]}>{currentCategory.name}</Text>
+          </View>
+
           <View style={styles.statsRow}>
             <View style={styles.statSquare}>
               <Text style={[styles.statValue, { color: theme.primary }]}>{goal.streak}</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>CURRENT</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>AKTUALNY</Text>
             </View>
             <View style={styles.statSquare}>
               <Text style={[styles.statValue, { color: theme.warning }]}>{bestStreak}</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>BEST</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>NAJLEPSZY</Text>
             </View>
             <View style={styles.statSquare}>
               <Text style={[styles.statValue, { color: theme.success }]}>{totalCompleted}</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>TOTAL</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>SUMA</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Progress Overview</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Podgląd postępu</Text>
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>FULL PERSISTENCE MAP</Text>
+            <Text style={[styles.cardLabel, { color: theme.textSecondary }]}>MAPA WYTRWAŁOŚCI</Text>
             <ContributionGrid history={goal.history} daysToDisplay={98} />
             <Text style={[styles.completionText, { color: theme.textSecondary }]}>
-              Success rate: <Text style={{ color: theme.text }}>{completionRate}%</Text> for last 3 months
+              Skuteczność: <Text style={{ color: theme.text }}>{completionRate}%</Text> w ostatnich 3 miesiącach
             </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Actions</Text>
-          <TouchableOpacity 
-             style={[styles.actionButton, { backgroundColor: theme.surface, borderColor: theme.border }]}
-             onPress={() => setIsEditModalVisible(true)}
-          >
-            <Ionicons name="pencil-outline" size={20} color={theme.primary} />
-            <Text style={[styles.actionText, { color: theme.text }]}>Edit Habit Title/Icon</Text>
-          </TouchableOpacity>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Akcje</Text>
+          <View style={styles.actionGrid}>
+            <TouchableOpacity 
+               style={[styles.actionButton, { backgroundColor: theme.surface, borderColor: theme.border, flex: 1 }]}
+               onPress={() => setIsEditModalVisible(true)}
+            >
+              <Ionicons name="pencil-outline" size={20} color={theme.primary} />
+              <Text style={[styles.actionText, { color: theme.text }]}>Edytuj</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+               style={[styles.actionButton, { backgroundColor: theme.surface, borderColor: theme.error || '#FF4444', flex: 1 }]}
+               onPress={handleDelete}
+            >
+              <Ionicons name="trash-outline" size={20} color={theme.error || '#FF4444'} />
+              <Text style={[styles.actionText, { color: theme.text }]}>Usuń</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
@@ -140,23 +183,50 @@ const GoalDetailsScreen = () => {
         >
           <View style={[styles.modalContent, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Edit Habit</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Edytuj Nawyk</Text>
               <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
                 <Ionicons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView bounces={false}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>NAME</Text>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>NAZWA</Text>
               <TextInput
                 style={[styles.modalInput, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                 value={editName}
                 onChangeText={setEditName}
-                placeholder="Habit Name"
+                placeholder="Nazwa nawyku"
                 placeholderTextColor={theme.textSecondary}
               />
 
-              <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: 20 }]}>ICON</Text>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: 20 }]}>KATEGORIA</Text>
+              <View style={styles.categoryGrid}>
+                {HABIT_CATEGORIES.map(cat => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    onPress={() => setEditCategory(cat.id)}
+                    style={[
+                      styles.categoryOption,
+                      { backgroundColor: theme.background, borderColor: theme.border },
+                      editCategory === cat.id && { backgroundColor: theme.primary, borderColor: theme.primary }
+                    ]}
+                  >
+                    <Ionicons 
+                      name={cat.icon as any} 
+                      size={18} 
+                      color={editCategory === cat.id ? '#FFFFFF' : theme.text} 
+                    />
+                    <Text style={[
+                      styles.categoryText, 
+                      { color: editCategory === cat.id ? '#FFFFFF' : theme.textSecondary }
+                    ]}>
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: 20 }]}>IKONA</Text>
               <View style={styles.iconGrid}>
                 {HABIT_ICONS.map(icon => (
                   <TouchableOpacity
@@ -181,7 +251,7 @@ const GoalDetailsScreen = () => {
                 style={[styles.saveButton, { backgroundColor: theme.primary }]}
                 onPress={handleUpdate}
               >
-                <Text style={styles.saveButtonText}>Save Changes</Text>
+                <Text style={styles.saveButtonText}>Zapisz zmiany</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -338,6 +408,44 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 16,
+    fontWeight: '600',
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    gap: 8,
+    marginBottom: 24,
+  },
+  categoryBadgeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  categoryText: {
+    fontSize: 14,
     fontWeight: '600',
   },
   modalOverlay: {

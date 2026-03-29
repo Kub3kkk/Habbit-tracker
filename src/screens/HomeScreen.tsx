@@ -3,18 +3,17 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  FlatList, 
+  ScrollView, 
   TouchableOpacity, 
-  Alert, 
-  ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { GoalService, Goal } from '../services/GoalService';
-import ContributionGrid from '../components/ContributionGrid';
+import { HABIT_CATEGORIES } from '../constants/HabitCategories';
 
 const HomeScreen = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -23,99 +22,87 @@ const HomeScreen = () => {
   const { theme } = useTheme();
   const navigation = useNavigation<any>();
 
+  const loadGoals = useCallback(async () => {
+    const fetchedGoals = await GoalService.getGoals();
+    setGoals(fetchedGoals);
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadGoals();
-    }, [])
+    }, [loadGoals])
   );
-
-  const loadGoals = async () => {
-    if (!refreshing) setLoading(true);
-    const storedGoals = await GoalService.getGoals();
-    setGoals(sortGoals(storedGoals));
-    setLoading(false);
-    setRefreshing(false);
-  };
 
   const handleRefresh = () => {
     setRefreshing(true);
     loadGoals();
   };
 
-  const sortGoals = (unsorted: Goal[]) => {
-    return [...unsorted].sort((a, b) => {
-      const aDone = isCompletedToday(a);
-      const bDone = isCompletedToday(b);
-      if (aDone && !bDone) return 1;
-      if (!aDone && bDone) return -1;
-      return b.id.localeCompare(a.id);
-    });
+  const toggleGoal = async (id: string) => {
+    const updated = await GoalService.toggleGoal(id);
+    setGoals(updated);
   };
 
-  const handleDeleteGoal = (id: string, name: string) => {
-    Alert.alert(
-      'Delete Habit',
-      `Are you sure? All progress for "${name}" will be lost.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive', 
-          onPress: async () => {
-            const updated = await GoalService.deleteGoal(id);
-            setGoals(sortGoals(updated));
-          }
-        },
-      ]
+  const renderGoal = (item: Goal) => {
+    const isCompletedToday = item.history && item.history.includes(new Date().toLocaleDateString('en-CA'));
+
+    return (
+      <TouchableOpacity 
+        key={item.id}
+        style={[styles.goalCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        onPress={() => navigation.navigate('GoalDetails', { goalId: item.id })}
+      >
+        <View style={styles.goalInfo}>
+          <View style={[styles.iconContainer, { backgroundColor: theme.background }]}>
+            <Ionicons name={item.icon as any} size={24} color={theme.primary} />
+          </View>
+          <View style={{ opacity: isCompletedToday ? 0.5 : 1 }}>
+            <Text style={[
+              styles.goalName, 
+              { color: theme.text, textDecorationLine: isCompletedToday ? 'line-through' : 'none' }
+            ]}>
+              {item.name}
+            </Text>
+            <View style={styles.streakBadge}>
+              <Ionicons name="flame" size={14} color={theme.warning} />
+              <Text style={[styles.streakText, { color: theme.textSecondary }]}>{item.streak} dni pod rząd</Text>
+            </View>
+          </View>
+        </View>
+        
+        <TouchableOpacity 
+          style={[
+            styles.checkbox, 
+            { borderColor: theme.primary },
+            isCompletedToday && { backgroundColor: theme.primary }
+          ]} 
+          onPress={() => toggleGoal(item.id)}
+        >
+          {isCompletedToday && <Ionicons name="checkmark" size={18} color="#FFFFFF" />}
+        </TouchableOpacity>
+      </TouchableOpacity>
     );
   };
 
-  const handleToggleGoal = async (id: string) => {
-    const updated = await GoalService.toggleGoal(id);
-    setGoals(sortGoals(updated));
-  };
+  const renderCategorySection = (cat: typeof HABIT_CATEGORIES[0]) => {
+    const categoryGoals = goals.filter(g => g.category === cat.id);
+    if (categoryGoals.length === 0) return null;
 
-  const isCompletedToday = (goal: Goal) => {
-    const todayStr = new Date().toLocaleDateString('en-CA');
-    return goal.history?.includes(todayStr) || false;
-  };
-
-  const renderGoal = ({ item }: { item: Goal }) => {
-    const completed = isCompletedToday(item);
     return (
-      <TouchableOpacity 
-        activeOpacity={0.8}
-        style={[styles.habitCard, { backgroundColor: theme.surface, borderColor: theme.border }, completed && styles.habitCardCompleted]}
-        onPress={() => navigation.navigate('GoalDetails', { goalId: item.id })}
-        onLongPress={() => handleDeleteGoal(item.id, item.name)}
-      >
-        <View style={styles.cardHeader}>
-          <View style={[styles.iconContainer, { backgroundColor: theme.background }]}>
-            <Ionicons name={item.icon as any} size={24} color={completed ? theme.textSecondary : theme.primary} />
+      <View key={cat.id} style={styles.categorySection}>
+        <View style={styles.categoryHeader}>
+          <Ionicons name={cat.icon as any} size={18} color={theme.primary} />
+          <Text style={[styles.categoryTitle, { color: theme.text }]}>{cat.name}</Text>
+          <View style={[styles.categoryCount, { backgroundColor: theme.border }]}>
+            <Text style={[styles.categoryCountText, { color: theme.textSecondary }]}>{categoryGoals.length}</Text>
           </View>
-          <View style={styles.habitInfo}>
-            <Text style={[styles.habitName, { color: theme.text }, completed && { color: theme.textSecondary, textDecorationLine: 'line-through' }]}>
-              {item.name}
-            </Text>
-            <View style={styles.streakRow}>
-              <Ionicons name="flame" size={16} color={theme.warning} />
-              <Text style={[styles.habitStreak, { color: theme.warning }]}>{item.streak} day streak</Text>
-            </View>
-          </View>
-          <TouchableOpacity 
-            activeOpacity={0.7} 
-            onPress={() => handleToggleGoal(item.id)}
-            style={[styles.checkbox, { borderColor: theme.border, backgroundColor: theme.background }, completed && { backgroundColor: theme.success, borderColor: theme.success }]}
-          >
-            {completed && <Ionicons name="checkmark" size={20} color="#FFFFFF" />}
-          </TouchableOpacity>
         </View>
-
-        <View style={[styles.gridSection, { borderTopColor: theme.border }]}>
-          <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>Last 4 weeks persistence:</Text>
-          <ContributionGrid history={item.history || []} daysToDisplay={28} />
+        <View style={styles.categoryGoalsGrid}>
+          {categoryGoals.map(renderGoal)}
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -123,36 +110,36 @@ const HomeScreen = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: theme.text }]}>Dashboard</Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Your progress at a glance</Text>
+          <Text style={[styles.welcome, { color: theme.textSecondary }]}>Cześć!</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Twoje Nawyki</Text>
         </View>
       </View>
 
-      {loading && !refreshing ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={theme.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={goals}
-          keyExtractor={(item) => item.id}
-          renderItem={renderGoal}
-          contentContainerStyle={styles.listContainer}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={theme.primary}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="calendar-outline" size={64} color={theme.border} />
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Empty dashboard. Time to start a habit!</Text>
-            </View>
-          }
-        />
-      )}
+      <ScrollView 
+        contentContainerStyle={styles.scroll} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.primary}
+          />
+        }
+      >
+        {loading && !refreshing ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={theme.primary} />
+          </View>
+        ) : goals.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="leaf-outline" size={80} color={theme.border} />
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>Brak nawyków</Text>
+            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Dodaj swój pierwszy nawyk, aby zacząć śledzić postępy!</Text>
+          </View>
+        ) : (
+          HABIT_CATEGORIES.map(renderCategorySection)
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -162,39 +149,78 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 24,
     paddingTop: 12,
   },
+  welcome: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '800',
   },
-  subtitle: {
-    fontSize: 16,
-    marginTop: 4,
+  addButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 4,
   },
-  listContainer: {
+  scroll: {
     paddingHorizontal: 24,
     paddingBottom: 40,
   },
-  habitCard: {
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
+  categorySection: {
+    marginBottom: 24,
   },
-  habitCardCompleted: {
-    opacity: 0.85,
-  },
-  cardHeader: {
+  categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     marginBottom: 16,
+    marginLeft: 4,
+  },
+  categoryTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  categoryCount: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  categoryCountText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  categoryGoalsGrid: {
+    gap: 12,
+  },
+  goalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  goalInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 16,
   },
   iconContainer: {
@@ -204,55 +230,50 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  habitInfo: {
-    flex: 1,
-  },
-  habitName: {
-    fontSize: 20,
+  goalName: {
+    fontSize: 18,
     fontWeight: '700',
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  streakRow: {
+  streakBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
-  habitStreak: {
-    fontSize: 14,
+  streakText: {
+    fontSize: 13,
     fontWeight: '600',
   },
   checkbox: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: 12,
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  gridSection: {
-    borderTopWidth: 1,
-    paddingTop: 16,
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 60,
   },
-  gridLabel: {
-    fontSize: 12,
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 20,
     marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    paddingHorizontal: 40,
+    lineHeight: 24,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emptyContainer: {
-    marginTop: 100,
-    alignItems: 'center',
-    opacity: 0.6,
-  },
-  emptyText: {
-    fontSize: 16,
-    marginTop: 16,
-    textAlign: 'center',
+    paddingTop: 40,
   },
 });
 

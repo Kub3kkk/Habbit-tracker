@@ -16,89 +16,151 @@ import { GoalService } from '../services/GoalService';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { HABIT_ICONS } from '../constants/HabitIcons';
+import { HABIT_CATEGORIES } from '../constants/HabitCategories';
 
 const AddGoalScreen = () => {
   const [name, setName] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState('star');
-  const [loading, setLoading] = useState(false);
+  const [icon, setIcon] = useState(HABIT_ICONS[0]);
+  const [category, setCategory] = useState(HABIT_CATEGORIES[0].id);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState(new Date());
+  const [showTimePicker, setShowTimePicker] = useState(false);
   
-  const { theme } = useTheme();
   const navigation = useNavigation<any>();
+  const { theme } = useTheme();
 
-  const handleCreate = async () => {
-    if (!name.trim()) return;
-    setLoading(true);
-    
-    await GoalService.addGoal(name.trim(), selectedIcon, null);
-    
-    setName('');
-    setSelectedIcon('star');
-    setLoading(false);
-    navigation.navigate('Dashboard');
+  const handleSave = async () => {
+    if (name.trim()) {
+      await GoalService.addGoal(
+        name.trim(), 
+        icon, 
+        category,
+        reminderEnabled ? reminderTime.toISOString() : null
+      );
+      navigation.goBack();
+    }
+  };
+
+  const onTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowTimePicker(false);
+    if (selectedDate) {
+      setReminderTime(selectedDate);
+    }
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text }]}>New Habit</Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Define your next achievement</Text>
-        </View>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="close" size={24} color={theme.text} />
+        </TouchableOpacity>
+        <Text style={[styles.title, { color: theme.text }]}>Nowy Nawyk</Text>
+        <TouchableOpacity onPress={handleSave} disabled={!name.trim()} style={styles.saveButton}>
+          <Text style={[styles.saveText, { color: name.trim() ? theme.primary : theme.textSecondary }]}>Zapisz</Text>
+        </TouchableOpacity>
+      </View>
 
-        <View style={[styles.form, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.label, { color: theme.text }]}>What do you want to achieve?</Text>
+      <ScrollView contentContainerStyle={styles.content} bounces={false}>
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>NAZWA</Text>
           <TextInput
-            style={[styles.input, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
-            placeholder="e.g., Read for 30 min"
+            style={[styles.input, { color: theme.text, backgroundColor: theme.surface, borderColor: theme.border }]}
+            placeholder="np. Pij wodę"
             placeholderTextColor={theme.textSecondary}
             value={name}
             onChangeText={setName}
             autoFocus
           />
+        </View>
 
-          <Text style={[styles.label, { color: theme.text, marginTop: 8 }]}>Pick an icon</Text>
-          <View style={styles.iconGrid}>
-            {HABIT_ICONS.map((icon) => (
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>KATEGORIA</Text>
+          <View style={styles.categoryGrid}>
+            {HABIT_CATEGORIES.map((cat) => (
               <TouchableOpacity
-                key={icon}
-                onPress={() => setSelectedIcon(icon)}
+                key={cat.id}
+                onPress={() => setCategory(cat.id)}
                 style={[
-                  styles.iconOption,
-                  { backgroundColor: theme.background, borderColor: theme.border },
-                  selectedIcon === icon && { backgroundColor: theme.primary, borderColor: theme.primary }
+                  styles.categoryOption,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  category === cat.id && { backgroundColor: theme.primary, borderColor: theme.primary }
                 ]}
               >
                 <Ionicons 
-                  name={icon as any} 
+                  name={cat.icon as any} 
+                  size={20} 
+                  color={category === cat.id ? '#FFFFFF' : theme.text} 
+                />
+                <Text style={[
+                  styles.categoryText, 
+                  { color: category === cat.id ? '#FFFFFF' : theme.textSecondary }
+                ]}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>IKONA</Text>
+          <View style={styles.iconGrid}>
+            {HABIT_ICONS.map((iconName) => (
+              <TouchableOpacity
+                key={iconName}
+                onPress={() => setIcon(iconName)}
+                style={[
+                  styles.iconOption,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  icon === iconName && { backgroundColor: theme.primary, borderColor: theme.primary }
+                ]}
+              >
+                <Ionicons 
+                  name={iconName as any} 
                   size={24} 
-                  color={selectedIcon === icon ? '#FFFFFF' : theme.text} 
+                  color={icon === iconName ? '#FFFFFF' : theme.text} 
                 />
               </TouchableOpacity>
             ))}
           </View>
-
-          <View style={styles.tips}>
-            <View style={styles.tipRow}>
-              <Ionicons name="flash-outline" size={20} color={theme.primary} />
-              <Text style={[styles.tipText, { color: theme.textSecondary }]}>Start small and stay consistent.</Text>
-            </View>
-            <View style={styles.tipRow}>
-              <Ionicons name="time-outline" size={20} color={theme.primary} />
-              <Text style={[styles.tipText, { color: theme.textSecondary }]}>Focus on the process, not just the result.</Text>
-            </View>
-          </View>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.button, { backgroundColor: theme.primary }, !name.trim() && styles.buttonDisabled]} 
-          onPress={handleCreate}
-          disabled={!name.trim() || loading}
-        >
-          <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>
-            {loading ? 'Creating...' : 'Launch Habit'}
-          </Text>
-          <Ionicons name="rocket-outline" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+        <View style={[styles.reminderContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.reminderRow}>
+            <View style={styles.reminderLabelRow}>
+              <Ionicons name="notifications-outline" size={20} color={theme.primary} />
+              <Text style={[styles.reminderLabel, { color: theme.text }]}>Przypomnienie</Text>
+            </View>
+            <Switch
+              value={reminderEnabled}
+              onValueChange={setReminderEnabled}
+              trackColor={{ false: theme.border, true: theme.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+          
+          {reminderEnabled && (
+            <TouchableOpacity 
+              style={styles.timePickerButton}
+              onPress={() => setShowTimePicker(true)}
+            >
+              <Text style={[styles.timeText, { color: theme.text }]}>
+                {reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+            </TouchableOpacity>
+          )}
+
+          {showTimePicker && (
+            <DateTimePicker
+              value={reminderTime}
+              mode="time"
+              is24Hour={true}
+              display="default"
+              onChange={onTimeChange}
+            />
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -108,84 +170,113 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scroll: {
-    padding: 24,
-  },
   header: {
-    marginBottom: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 32,
+    fontSize: 20,
     fontWeight: '800',
   },
-  subtitle: {
-    fontSize: 16,
-    marginTop: 8,
+  saveButton: {
+    paddingHorizontal: 12,
   },
-  form: {
-    borderRadius: 24,
+  saveText: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  content: {
     padding: 24,
-    borderWidth: 1,
-    marginBottom: 24,
+  },
+  inputContainer: {
+    marginBottom: 32,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 16,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    marginBottom: 12,
   },
   input: {
+    fontSize: 20,
+    fontWeight: '600',
+    padding: 16,
     borderRadius: 16,
-    padding: 20,
-    fontSize: 18,
     borderWidth: 1,
-    marginBottom: 24,
+  },
+  section: {
+    marginBottom: 32,
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  categoryText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   iconGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 24,
   },
   iconOption: {
     width: 50,
     height: 50,
     borderRadius: 15,
-    borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
   },
-  tips: {
-    gap: 16,
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 16,
-  },
-  tipRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  tipText: {
-    fontSize: 14,
-  },
-  button: {
-    borderRadius: 20,
+  reminderContainer: {
     padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  reminderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 16,
-    elevation: 8,
+    justifyContent: 'space-between',
   },
-  buttonDisabled: {
-    opacity: 0.5,
+  reminderLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  buttonText: {
+  reminderLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  timePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  timeText: {
     fontSize: 18,
     fontWeight: '700',
   },

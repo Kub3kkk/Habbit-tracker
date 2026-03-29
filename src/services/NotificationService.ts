@@ -40,40 +40,53 @@ export const NotificationService = {
   },
 
   scheduleGoalReminder: async (goalId: string, name: string, time: Date) => {
-    const isEnabled = await NotificationService.isGloballyEnabled();
-    if (!isEnabled) return null;
+    try {
+      const isEnabled = await NotificationService.isGloballyEnabled();
+      if (!isEnabled) return null;
 
-    // Request permissions just in case
-    const hasPermission = await NotificationService.requestPermissions();
-    if (!hasPermission) return null;
+      // Request permissions
+      const hasPermission = await NotificationService.requestPermissions();
+      if (!hasPermission) {
+        console.warn('Notification permissions not granted');
+        return null;
+      }
 
-    // Cancel existing for this goal if any
-    await NotificationService.cancelGoalReminder(goalId);
+      // Cancel existing for this goal if any
+      await NotificationService.cancelGoalReminder(goalId);
 
-    const trigger: Notifications.NotificationTriggerInput = {
-      type: 'calendar' as any, // Cast to any to bypass strict union check if needed, or use the correct enum
-      hour: time.getHours(),
-      minute: time.getMinutes(),
-      repeats: true,
-    };
+      // Structure for a daily recurring notification at a specific time
+      const trigger = {
+        type: 'daily' as any,
+        hour: time.getHours(),
+        minute: time.getMinutes(),
+      };
 
-    const identifier = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Habit Reminder 🚀",
-        body: `Did you complete your goal: "${name}"?`,
-        data: { goalId },
-      },
-      trigger,
-    });
+      const identifier = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Przypomnienie o nawyku 🚀",
+          body: `Czas na: "${name}"! Jak Ci dzisiaj idzie?`,
+          data: { goalId },
+        },
+        trigger,
+      });
 
-    return identifier;
+      return identifier;
+    } catch (error) {
+      console.error('Failed to schedule notification:', error);
+      // We return null but don't throw, so the habit creation can continue
+      return null;
+    }
   },
 
   cancelGoalReminder: async (goalId: string) => {
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    const toCancel = scheduled.filter(n => n.content.data?.goalId === goalId);
-    for (const n of toCancel) {
-      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    try {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      const toCancel = scheduled.filter(n => n.content.data?.goalId === goalId);
+      for (const n of toCancel) {
+        await Notifications.cancelScheduledNotificationAsync(n.identifier);
+      }
+    } catch (error) {
+      console.error('Failed to cancel notification:', error);
     }
   }
 };

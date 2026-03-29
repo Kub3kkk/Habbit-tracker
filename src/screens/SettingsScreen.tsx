@@ -109,7 +109,7 @@ const SettingsScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <Text style={[styles.version, { color: theme.textSecondary }]}>Habbit Tracker v1.0.0</Text>
+        <Text style={[styles.version, { color: theme.textSecondary }]}>Habbit Tracker v1.1.0</Text>
       </ScrollView>
     </SafeAreaView>
   );
